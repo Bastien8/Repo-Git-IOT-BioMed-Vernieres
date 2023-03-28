@@ -11,20 +11,33 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import fr.isen.vernieres.androidsmartdevice.databinding.ActivityScanBinding
 import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothClass.Device
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
+import android.os.Looper
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 class ScanActivity : AppCompatActivity() {
     private lateinit var binding: ActivityScanBinding
+    private lateinit var adapter: DeviceBLEAdapter
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = ActivityScanBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        adapter= DeviceBLEAdapter(deviceList)
+        binding.ScanList.adapter=adapter
 
         val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
         if (bluetoothAdapter == null) {
@@ -47,27 +60,40 @@ class ScanActivity : AppCompatActivity() {
         }
 
     }
+
+    @SuppressLint("MissingPermission")
+    override fun onStop() {
+        super.onStop()
+        if (bluetoothAdapter?.isEnabled == true && allPermissionGranted()) {
+            scanning = false
+            bluetoothAdapter?.bluetoothLeScanner?.stopScan(leScanCallback)
+        }
+
+    }
+    @SuppressLint("MissingPermission")
     private fun ScanBLE() {
-        var scanning = true
+
         binding.progressBar.isVisible=false
-        binding.ScanList.isVisible=false
 
-
-        binding.ScanList.layoutManager=LinearLayoutManager(this)
-        binding.ScanList.adapter=DeviceBLEAdapter(arrayListOf("Device 1","Device 2","Device 3 "))
 
         binding.floatingActionButton2.setOnClickListener{
-            if (scanning == true) {
+            if (!scanning) {
                 binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_pause)
                 binding.progressBar.isVisible=true
-                binding.ScanList.isVisible=true
-            }
-            else {
+                handler.postDelayed({
+                    scanning = false
+                    bluetoothAdapter?.bluetoothLeScanner?.stopScan(leScanCallback)
+                }, SCAN_PERIOD)
+                scanning = true
+                bluetoothAdapter?.bluetoothLeScanner?.startScan(leScanCallback)
+
+            } else {
                 binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_play)
                 binding.progressBar.isVisible=false
-                binding.ScanList.isVisible=false
+                scanning = false
+                bluetoothAdapter?.bluetoothLeScanner?.stopScan(leScanCallback)
             }
-            scanning = !scanning
+
         }
     }
 
@@ -113,26 +139,43 @@ class ScanActivity : AppCompatActivity() {
 
     }
 
-   // private val bluetoothLeScanner = BluetoothAdapter.bluetoothLeScanner
+    private val bluetoothAdapter: BluetoothAdapter by
+    lazy(LazyThreadSafetyMode.NONE) {
+        val bluetoothManager =
+            getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothManager.adapter
+    }
+
     private var scanning = false
-    private val handler = Handler()
+    private val handler = Handler(Looper.getMainLooper())
 
-    // Stops scanning after 10 seconds.
+    private var Devices: ArrayList<BLE> = ArrayList()
+
+    //Stops scanning after 10 seconds.
     private val SCAN_PERIOD: Long = 10000
+    private val deviceList = ArrayList<BluetoothDevice>()
 
-    /*private fun scanLeDevice() {
-        if (!scanning) { // Stops scanning after a pre-defined scan period.
-            handler.postDelayed({
-                scanning = false
-                bluetoothLeScanner.stopScan(leScanCallback)
-            }, SCAN_PERIOD)
-            scanning = true
-            bluetoothLeScanner.startScan(leScanCallback)
-        } else {
-            scanning = false
-            bluetoothLeScanner.stopScan(leScanCallback)
+
+    private val leDeviceListAdapter = Device()
+    // Device scan callback.
+    private val leScanCallback: ScanCallback = object : ScanCallback() {
+        @SuppressLint("MissingPermission")
+        override fun onScanResult(callbackType: Int, result: ScanResult) {
+            super.onScanResult(callbackType, result)
+            adapter.addDevice(result.device)
+            /*var ble = BLE()
+            ble.name = result.device.name
+            ble.address = result.device.address
+            Devices.add(ble)*/
+
+
         }
-    }*/
+    }
+
+    class BLE {
+        lateinit var name: String
+        lateinit var address: String
+    }
 }
 
 

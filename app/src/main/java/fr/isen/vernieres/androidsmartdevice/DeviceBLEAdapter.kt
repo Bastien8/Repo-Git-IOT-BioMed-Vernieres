@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import fr.isen.vernieres.androidsmartdevice.databinding.ScanCellBinding
 
-class DeviceBLEAdapter(var devices: ArrayList<BluetoothDevice>) : RecyclerView.Adapter<DeviceBLEAdapter.ScanViewHolder>() {
+class DeviceBLEAdapter(var devices: ArrayList<BluetoothDevice>, var onClick : (String) -> Unit) : RecyclerView.Adapter<DeviceBLEAdapter.ScanViewHolder>() {
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ScanViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         val binding = ScanCellBinding.inflate(inflater, parent, false)

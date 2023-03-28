@@ -1,31 +1,25 @@
 package fr.isen.vernieres.androidsmartdevice
 
-import android.bluetooth.BluetoothAdapter
-import androidx.appcompat.app.AppCompatActivity
-import android.os.Bundle
-import android.widget.Button
-import android.widget.Toast
-import androidx.core.view.isVisible
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import fr.isen.vernieres.androidsmartdevice.databinding.ActivityScanBinding
 import android.Manifest
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothClass.Device
-import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
-import androidx.core.app.ActivityCompat
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
+import androidx.recyclerview.widget.LinearLayoutManager
+import fr.isen.vernieres.androidsmartdevice.databinding.ActivityScanBinding
 
 class ScanActivity : AppCompatActivity() {
     private lateinit var binding: ActivityScanBinding
@@ -36,17 +30,19 @@ class ScanActivity : AppCompatActivity() {
         binding = ActivityScanBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adapter= DeviceBLEAdapter(deviceList)
+        adapter= DeviceBLEAdapter(arrayListOf()) {
+
+        }
         binding.ScanList.adapter=adapter
 
-        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+
         if (bluetoothAdapter == null) {
             val toast_err = Toast.makeText(applicationContext,"Votre appareil ne possède pas de bluetooth ", Toast.LENGTH_LONG)
             toast_err.show()
             binding.progressBar.isVisible=false
             binding.ScanList.isVisible=false
         } else {
-            if (bluetoothAdapter.isEnabled) {
+            if (bluetoothAdapter?.isEnabled == true) {
                 val toast_val = Toast.makeText(applicationContext,"appareil prêt à l'utilisation",Toast.LENGTH_SHORT)
                 toast_val.show()
                 scanDeviceWithPermissions()
@@ -72,29 +68,19 @@ class ScanActivity : AppCompatActivity() {
     }
     @SuppressLint("MissingPermission")
     private fun ScanBLE() {
-
-        binding.progressBar.isVisible=false
-
-
-        binding.floatingActionButton2.setOnClickListener{
-            if (!scanning) {
-                binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_pause)
-                binding.progressBar.isVisible=true
-                handler.postDelayed({
-                    scanning = false
-                    bluetoothAdapter?.bluetoothLeScanner?.stopScan(leScanCallback)
-                }, SCAN_PERIOD)
-                scanning = true
-                bluetoothAdapter?.bluetoothLeScanner?.startScan(leScanCallback)
-
-            } else {
-                binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_play)
-                binding.progressBar.isVisible=false
+        if (!scanning) {
+            handler.postDelayed({
                 scanning = false
                 bluetoothAdapter?.bluetoothLeScanner?.stopScan(leScanCallback)
-            }
+            }, SCAN_PERIOD)
+            scanning = true
+            bluetoothAdapter?.bluetoothLeScanner?.startScan(leScanCallback)
 
+        } else {
+            scanning = false
+            bluetoothAdapter?.bluetoothLeScanner?.stopScan(leScanCallback)
         }
+
     }
 
     val requestPermissionLauncher =
@@ -125,7 +111,7 @@ class ScanActivity : AppCompatActivity() {
 
     private fun scanDeviceWithPermissions(){
         if(allPermissionGranted()) {
-            ScanBLE()
+            initToggleActions()
         } else {
             requestPermissionLauncher.launch(getAllPermissions())
         }
@@ -139,7 +125,7 @@ class ScanActivity : AppCompatActivity() {
 
     }
 
-    private val bluetoothAdapter: BluetoothAdapter by
+    private val bluetoothAdapter: BluetoothAdapter? by
     lazy(LazyThreadSafetyMode.NONE) {
         val bluetoothManager =
             getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -149,32 +135,40 @@ class ScanActivity : AppCompatActivity() {
     private var scanning = false
     private val handler = Handler(Looper.getMainLooper())
 
-    private var Devices: ArrayList<BLE> = ArrayList()
-
     //Stops scanning after 10 seconds.
     private val SCAN_PERIOD: Long = 10000
-    private val deviceList = ArrayList<BluetoothDevice>()
 
-
-    private val leDeviceListAdapter = Device()
     // Device scan callback.
     private val leScanCallback: ScanCallback = object : ScanCallback() {
         @SuppressLint("MissingPermission")
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
             adapter.addDevice(result.device)
-            /*var ble = BLE()
-            ble.name = result.device.name
-            ble.address = result.device.address
-            Devices.add(ble)*/
-
-
+            adapter.notifyDataSetChanged()
         }
     }
-
-    class BLE {
-        lateinit var name: String
-        lateinit var address: String
+    private fun initToggleActions() {
+        binding.floatingActionButton2.setOnClickListener {
+            binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_pause)
+            togglePlayPauseAction()
+            ScanBLE()
+        }
+        binding.ScanList.layoutManager = LinearLayoutManager(this)
+        adapter = DeviceBLEAdapter(arrayListOf()) {
+            val intent = Intent(this, DeviceActivity::class.java)
+            intent.putExtra("device", it)
+            startActivity(intent)
+        }
+        binding.ScanList.adapter = adapter
+    }
+    private fun togglePlayPauseAction() {
+        if (scanning) {
+            binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_pause)
+            binding.progressBar.isVisible = true
+        } else {
+            binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_play)
+            binding.progressBar.isVisible = false
+        }
     }
 }
 

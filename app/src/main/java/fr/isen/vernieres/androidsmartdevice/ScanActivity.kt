@@ -2,8 +2,7 @@ package fr.isen.vernieres.androidsmartdevice
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
+import android.bluetooth.*
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
@@ -13,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -24,15 +24,24 @@ import fr.isen.vernieres.androidsmartdevice.databinding.ActivityScanBinding
 class ScanActivity : AppCompatActivity() {
     private lateinit var binding: ActivityScanBinding
     private lateinit var adapter: DeviceBLEAdapter
+    private val DeviceList = ArrayList<ListBLE>()
+    private var bluetoothGatt: BluetoothGatt? = null
+    private val bluetoothGattCallback = object : BluetoothGattCallback() {
+        override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                // successfully connected to the GATT Server
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                // disconnected from the GATT Server
+            }
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = ActivityScanBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adapter= DeviceBLEAdapter(arrayListOf()) {
-
-        }
+        adapter= DeviceBLEAdapter(arrayListOf())
         binding.ScanList.adapter=adapter
 
 
@@ -46,6 +55,7 @@ class ScanActivity : AppCompatActivity() {
                 val toast_val = Toast.makeText(applicationContext,"appareil prêt à l'utilisation",Toast.LENGTH_SHORT)
                 toast_val.show()
                 scanDeviceWithPermissions()
+                binding.progressBar.isVisible=false
 
             } else {
                 val toast = Toast.makeText(applicationContext, "Le bluetooth n'est pas actif, activer le svp", Toast.LENGTH_LONG)
@@ -143,22 +153,42 @@ class ScanActivity : AppCompatActivity() {
         @SuppressLint("MissingPermission")
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
-            adapter.addDevice(result.device)
-            adapter.notifyDataSetChanged()
+            var multi = false
+            val NewDevice = ListBLE()
+            //adapter.addDevice(result.device)
+            //adapter.notifyDataSetChanged()
+            if(result.device.name != null){
+                if(DeviceList.isNotEmpty()){
+                    for(i in 0 until DeviceList.size){
+                        if(DeviceList[i].Nom == result.device.name){
+                            multi = true
+                        }
+                    }
+                    if(multi == false){
+                        Log.w(" SCAN ", "Device Name = ${result.device.name}")
+                        NewDevice.addDevice(result.device.name,result.device.address)
+                        DeviceList.add(NewDevice)
+                    }
+                } else {
+                    Log.w(" SCAN ", "Device Name = ${result.device.name}")
+                    NewDevice.addDevice(result.device.name,result.device.address)
+                    DeviceList.add(NewDevice)
+                }
+                binding.ScanList.adapter = DeviceBLEAdapter(DeviceList)
+            }
+
+
+
         }
     }
     private fun initToggleActions() {
         binding.floatingActionButton2.setOnClickListener {
             binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_pause)
-            togglePlayPauseAction()
             ScanBLE()
+            togglePlayPauseAction()
         }
         binding.ScanList.layoutManager = LinearLayoutManager(this)
-        adapter = DeviceBLEAdapter(arrayListOf()) {
-            val intent = Intent(this, DeviceActivity::class.java)
-            intent.putExtra("device", it)
-            startActivity(intent)
-        }
+        adapter = DeviceBLEAdapter(arrayListOf())
         binding.ScanList.adapter = adapter
     }
     private fun togglePlayPauseAction() {
@@ -169,6 +199,32 @@ class ScanActivity : AppCompatActivity() {
             binding.floatingActionButton2.setImageResource(android.R.drawable.ic_media_play)
             binding.progressBar.isVisible = false
         }
+    }
+    class ListBLE {
+        var Nom : String = ""
+        var Adresse : String = ""
+
+        fun addDevice (Name : String, address : String){
+            Nom = Name
+            Adresse = address
+        }
+    }
+    @SuppressLint("MissingPermission")
+    fun connect(address: String): Boolean {
+        bluetoothAdapter?.let { adapter ->
+            try {
+                val device = adapter.getRemoteDevice(address)
+                // connect to the GATT server on the device
+                bluetoothGatt = device.connectGatt(this, false, bluetoothGattCallback)
+                return true
+            } catch (exception: IllegalArgumentException) {
+                Log.w("connect", "Device not found with provided address.  Unable to connect.")
+                return false
+            }
+        } ?: run {
+            return false
+        }
+
     }
 }
 

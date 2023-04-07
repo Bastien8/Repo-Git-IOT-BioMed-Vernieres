@@ -25,23 +25,20 @@ class ScanActivity : AppCompatActivity() {
     private lateinit var binding: ActivityScanBinding
     private lateinit var adapter: DeviceBLEAdapter
     private val DeviceList = ArrayList<ListBLE>()
-    private var bluetoothGatt: BluetoothGatt? = null
-    private val bluetoothGattCallback = object : BluetoothGattCallback() {
-        override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
-                // successfully connected to the GATT Server
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                // disconnected from the GATT Server
-            }
-        }
-    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = ActivityScanBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adapter= DeviceBLEAdapter(arrayListOf())
+        adapter= DeviceBLEAdapter(arrayListOf()) { name, address ->
+            val intent = Intent(this, DeviceActivity::class.java)
+            intent.putExtra("name", name)
+            intent.putExtra("address", address)
+            startActivity(intent)
+        }
         binding.ScanList.adapter=adapter
 
 
@@ -174,7 +171,12 @@ class ScanActivity : AppCompatActivity() {
                     NewDevice.addDevice(result.device.name,result.device.address)
                     DeviceList.add(NewDevice)
                 }
-                binding.ScanList.adapter = DeviceBLEAdapter(DeviceList)
+                binding.ScanList.adapter = DeviceBLEAdapter(DeviceList) { name, address ->
+                    val intent = Intent(this@ScanActivity, DeviceActivity::class.java)
+                    intent.putExtra("name", name)
+                    intent.putExtra("address", address)
+                    startActivity(intent)
+                }
             }
 
 
@@ -188,7 +190,12 @@ class ScanActivity : AppCompatActivity() {
             togglePlayPauseAction()
         }
         binding.ScanList.layoutManager = LinearLayoutManager(this)
-        adapter = DeviceBLEAdapter(arrayListOf())
+        adapter = DeviceBLEAdapter(arrayListOf()) { name, address ->
+            val intent = Intent(this, DeviceActivity::class.java)
+            intent.putExtra("name", name)
+            intent.putExtra("address", address)
+            startActivity(intent)
+        }
         binding.ScanList.adapter = adapter
     }
     private fun togglePlayPauseAction() {
@@ -209,23 +216,7 @@ class ScanActivity : AppCompatActivity() {
             Adresse = address
         }
     }
-    @SuppressLint("MissingPermission")
-    fun connect(address: String): Boolean {
-        bluetoothAdapter?.let { adapter ->
-            try {
-                val device = adapter.getRemoteDevice(address)
-                // connect to the GATT server on the device
-                bluetoothGatt = device.connectGatt(this, false, bluetoothGattCallback)
-                return true
-            } catch (exception: IllegalArgumentException) {
-                Log.w("connect", "Device not found with provided address.  Unable to connect.")
-                return false
-            }
-        } ?: run {
-            return false
-        }
 
-    }
 }
 
 
